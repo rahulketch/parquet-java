@@ -20,6 +20,7 @@ package org.apache.parquet.schema;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Comparator;
 import org.apache.parquet.io.api.Binary;
 
@@ -205,6 +206,33 @@ public abstract class PrimitiveComparator<T> implements Comparator<T>, Serializa
           return "UNSIGNED_LEXICOGRAPHICAL_BINARY_COMPARATOR";
         }
       };
+  /*
+   * This comparator is for comparing two timestamps represented as int96 binary.
+   */
+  static final PrimitiveComparator<Binary> BINARY_AS_INT_96_COMPARATOR = new BinaryComparator() {
+
+    @Override
+    int compareBinary(Binary b1, Binary b2) {
+      return compare(b1.toByteBuffer(), b2.toByteBuffer());
+    }
+
+    int compare(ByteBuffer b1, ByteBuffer b2) {
+      b1.order(ByteOrder.LITTLE_ENDIAN);
+      b2.order(ByteOrder.LITTLE_ENDIAN);
+      int jd1 = b1.getInt(8);
+      int jd2 = b2.getInt(8);
+      if (jd1 != jd2) return Integer.compareUnsigned(jd1, jd2) < 0 ? -1 : 1;
+      long s1 = b1.getLong(0);
+      long s2 = b2.getLong(0);
+      if (s1 != s2) return Long.compareUnsigned(s1, s2) < 0 ? -1 : 1;
+      return 0;
+    }
+
+    @Override
+    public String toString() {
+      return "BINARY_AS_INT_96_COMPARATOR";
+    }
+  };
 
   /*
    * This comparator is for comparing two signed decimal values represented in twos-complement binary. In case of the

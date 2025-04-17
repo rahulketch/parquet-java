@@ -20,6 +20,7 @@ package org.apache.parquet.schema;
 
 import static org.apache.parquet.schema.PrimitiveComparator.BINARY_AS_FLOAT16_COMPARATOR;
 import static org.apache.parquet.schema.PrimitiveComparator.BINARY_AS_SIGNED_INTEGER_COMPARATOR;
+import static org.apache.parquet.schema.PrimitiveComparator.BINARY_AS_INT_96_COMPARATOR;
 import static org.apache.parquet.schema.PrimitiveComparator.BOOLEAN_COMPARATOR;
 import static org.apache.parquet.schema.PrimitiveComparator.DOUBLE_COMPARATOR;
 import static org.apache.parquet.schema.PrimitiveComparator.FLOAT_COMPARATOR;
@@ -33,8 +34,10 @@ import static org.junit.Assert.fail;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.parquet.example.data.simple.NanoTime;
 import org.apache.parquet.io.api.Binary;
 import org.junit.Test;
 
@@ -270,6 +273,36 @@ public class TestPrimitiveComparator {
             String.format("Wrong result of comparison %s and %s", v1, v2),
             0,
             BINARY_AS_SIGNED_INTEGER_COMPARATOR.compare(v1, v2));
+      }
+    }
+  }
+
+  private Binary timestampToInt96(String timestamp) {
+    LocalDateTime dt = LocalDateTime.parse(timestamp.replace(" ", "T"));
+    long julianDay = dt.toLocalDate().toEpochDay() + 2440588; // Convert to Julian Day
+    long nanos = dt.toLocalTime().toNanoOfDay();
+    return new NanoTime((int)julianDay, nanos).toBinary();
+  }
+
+  @Test
+  public void testInt96Comparator() {
+    Binary[] valuesInAscendingOrder = {
+            timestampToInt96("2020-01-01 00:00:00.000"), // New Year 2020
+            timestampToInt96("2020-02-29 23:59:59.999"), // Leap day 2020
+            timestampToInt96("2020-12-31 23:59:59.999"), // End of 2020
+            timestampToInt96("2021-01-01 00:00:00.000"), // Start of 2021
+            timestampToInt96("2023-06-15 12:30:45.500"), // Mid-2023
+            timestampToInt96("2024-02-29 15:45:30.750"), // Leap day 2024
+            timestampToInt96("2024-12-25 07:00:00.000"), // Christmas 2024
+            timestampToInt96("2025-01-01 00:00:00.000"), // New Year 2025
+            timestampToInt96("2025-07-04 20:00:00.000"), // July 4th 2025
+            timestampToInt96("2025-12-31 23:59:59.999")  // End of 2025
+    };
+    for (int i = 0; i < valuesInAscendingOrder.length; ++i) {
+      for (int j = 0; j < valuesInAscendingOrder.length; ++j) {
+        Binary bi = valuesInAscendingOrder[i];
+        Binary bj = valuesInAscendingOrder[j];
+        assertEquals(Integer.compare(i, j), BINARY_AS_INT_96_COMPARATOR.compare(bi, bj));
       }
     }
   }

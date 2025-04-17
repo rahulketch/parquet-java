@@ -1836,8 +1836,7 @@ public class ParquetMetadataConverter {
           // the types
           // where ordering is not supported.
           if (columnOrder.getColumnOrderName() == ColumnOrderName.TYPE_DEFINED_ORDER
-              && (schemaElement.type == Type.INT96
-                  || schemaElement.converted_type == ConvertedType.INTERVAL)) {
+              && (schemaElement.converted_type == ConvertedType.INTERVAL)) {
             columnOrder = org.apache.parquet.schema.ColumnOrder.undefined();
           }
           primitiveBuilder.columnOrder(columnOrder);

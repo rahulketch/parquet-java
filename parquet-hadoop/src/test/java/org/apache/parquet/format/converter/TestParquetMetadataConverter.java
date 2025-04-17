@@ -1154,10 +1154,6 @@ public class TestParquetMetadataConverter {
             .named(""),
         new BigInteger("12345678"),
         new BigInteger("12345679"));
-    testSkippedV2Stats(
-        Types.optional(PrimitiveTypeName.INT96).named(""),
-        new BigInteger("-75687987"),
-        new BigInteger("45367657"));
   }
 
   private void testSkippedV2Stats(PrimitiveType type, Object min, Object max) {
@@ -1389,7 +1385,7 @@ public class TestParquetMetadataConverter {
     assertEquals(
         ColumnOrder.typeDefined(), columns.get(0).getPrimitiveType().columnOrder());
     assertEquals(ColumnOrder.undefined(), columns.get(1).getPrimitiveType().columnOrder());
-    assertEquals(ColumnOrder.undefined(), columns.get(2).getPrimitiveType().columnOrder());
+    assertEquals(ColumnOrder.typeDefined(), columns.get(2).getPrimitiveType().columnOrder());
   }
 
   @Test
@@ -1458,13 +1454,13 @@ public class TestParquetMetadataConverter {
           .equals(columnIndex.getMaxValues()));
 
       assertNull(
-          "Should handle null column index",
+          "Should handle null column index int32",
           ParquetMetadataConverter.toParquetColumnIndex(
               Types.required(PrimitiveTypeName.INT32).named("test_int32"), null));
       assertNull(
-          "Should ignore unsupported types",
+          "Should handle null column index int96",
           ParquetMetadataConverter.toParquetColumnIndex(
-              Types.required(PrimitiveTypeName.INT96).named("test_int96"), columnIndex));
+              Types.required(PrimitiveTypeName.INT96).named("test_int96"), null));
       assertNull(
           "Should ignore unsupported types",
           ParquetMetadataConverter.fromParquetColumnIndex(
