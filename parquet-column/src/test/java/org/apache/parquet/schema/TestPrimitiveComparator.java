@@ -287,16 +287,16 @@ public class TestPrimitiveComparator {
   @Test
   public void testInt96Comparator() {
     Binary[] valuesInAscendingOrder = {
-            timestampToInt96("2020-01-01 00:00:00.000"), // New Year 2020
-            timestampToInt96("2020-02-29 23:59:59.999"), // Leap day 2020
-            timestampToInt96("2020-12-31 23:59:59.999"), // End of 2020
-            timestampToInt96("2021-01-01 00:00:00.000"), // Start of 2021
-            timestampToInt96("2023-06-15 12:30:45.500"), // Mid-2023
-            timestampToInt96("2024-02-29 15:45:30.750"), // Leap day 2024
-            timestampToInt96("2024-12-25 07:00:00.000"), // Christmas 2024
-            timestampToInt96("2025-01-01 00:00:00.000"), // New Year 2025
-            timestampToInt96("2025-07-04 20:00:00.000"), // July 4th 2025
-            timestampToInt96("2025-12-31 23:59:59.999")  // End of 2025
+            timestampToInt96("2020-01-01 00:00:00.000"),
+            timestampToInt96("2020-02-29 23:59:59.999"),
+            timestampToInt96("2020-12-31 23:59:59.999"),
+            timestampToInt96("2021-01-01 00:00:00.000"),
+            timestampToInt96("2023-06-15 12:30:45.500"),
+            timestampToInt96("2024-02-29 15:45:30.750"),
+            timestampToInt96("2024-12-25 07:00:00.000"),
+            timestampToInt96("2025-01-01 00:00:00.000"),
+            timestampToInt96("2025-07-04 20:00:00.000"),
+            timestampToInt96("2025-12-31 23:59:59.999")
     };
     for (int i = 0; i < valuesInAscendingOrder.length; ++i) {
       for (int j = 0; j < valuesInAscendingOrder.length; ++j) {

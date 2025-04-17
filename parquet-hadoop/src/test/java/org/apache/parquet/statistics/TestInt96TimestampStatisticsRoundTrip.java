@@ -87,8 +87,7 @@ public class TestInt96TimestampStatisticsRoundTrip {
   private void verifyStatistics(Path file, Binary minValue, Binary maxValue) throws IOException {
     Configuration conf = new Configuration();
     ParquetMetadata metadata = ParquetFileReader.readFooter(conf, file);
-    
-    // Verify INT96 statistics
+
     ColumnChunkMetaData timestampColumn = metadata.getBlocks().get(0).getColumns().get(0);
     Statistics<?> timestampStats = timestampColumn.getStatistics();
     
@@ -99,18 +98,17 @@ public class TestInt96TimestampStatisticsRoundTrip {
 
   @Test
   public void testInt96TimestampStatistics() throws IOException {
-    // Create test data with human-readable timestamps
     String[] timestamps = {
-      "2020-01-01 00:00:00.000", // New Year 2020
-      "2020-02-29 23:59:59.999", // Leap day 2020
-      "2020-12-31 23:59:59.999", // End of 2020
-      "2021-01-01 00:00:00.000", // Start of 2021
-      "2023-06-15 12:30:45.500", // Mid-2023
-      "2024-02-29 15:45:30.750", // Leap day 2024
-      "2024-12-25 07:00:00.000", // Christmas 2024
-      "2025-01-01 00:00:00.000", // New Year 2025
-      "2025-07-04 20:00:00.000", // July 4th 2025
-      "2025-12-31 23:59:59.999"  // End of 2025
+      "2020-01-01 00:00:00.000",
+      "2020-02-29 23:59:59.999",
+      "2020-12-31 23:59:59.999",
+      "2021-01-01 00:00:00.000",
+      "2023-06-15 12:30:45.500",
+      "2024-02-29 15:45:30.750",
+      "2024-12-25 07:00:00.000",
+      "2025-01-01 00:00:00.000",
+      "2025-07-04 20:00:00.000",
+      "2025-12-31 23:59:59.999"
     };
 
     Binary[] timestampValues = new Binary[timestamps.length];
@@ -118,12 +116,8 @@ public class TestInt96TimestampStatisticsRoundTrip {
       timestampValues[i] = timestampToInt96(timestamps[i]);
     }
 
-    Binary minValue = timestampToInt96("2020-01-01 00:00:00.000");
-    Binary maxValue = timestampToInt96("2025-12-31 23:59:59.999");
-
-    // Write and verify
     Path file = new Path(temp.getRoot().getPath(), "test_timestamps.parquet");
     writeParquetFile(file, timestampValues);
-    verifyStatistics(file, minValue, maxValue);
+    verifyStatistics(file, timestampToInt96(timestamps[0]), timestampToInt96(timestamps[timestamps.length - 1]));
   }
 }
