@@ -137,6 +137,7 @@ import org.apache.parquet.schema.TypeVisitor;
 import org.apache.parquet.schema.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.parquet.ValidInt96Stats;
 
 // TODO: This file has become too long!
 // TODO: Lets split it up: https://issues.apache.org/jira/browse/PARQUET-310
@@ -154,6 +155,7 @@ public class ParquetMetadataConverter {
       new ConvertedTypeConverterVisitor();
   private final int statisticsTruncateLength;
   private final boolean useSignedStringMinMax;
+  private final boolean readInt96Stats;
 
   public ParquetMetadataConverter() {
     this(false);
@@ -173,7 +175,7 @@ public class ParquetMetadataConverter {
   }
 
   public ParquetMetadataConverter(ParquetReadOptions options) {
-    this(options.useSignedStringMinMax());
+    this(options.useSignedStringMinMax(), ParquetProperties.DEFAULT_STATISTICS_TRUNCATE_LENGTH, options.useInt96Stats());
   }
 
   private ParquetMetadataConverter(boolean useSignedStringMinMax) {
@@ -181,11 +183,16 @@ public class ParquetMetadataConverter {
   }
 
   private ParquetMetadataConverter(boolean useSignedStringMinMax, int statisticsTruncateLength) {
+    this(useSignedStringMinMax, statisticsTruncateLength, true);
+  }
+
+  private ParquetMetadataConverter(boolean useSignedStringMinMax, int statisticsTruncateLength, boolean readInt96Stats) {
     if (statisticsTruncateLength <= 0) {
       throw new IllegalArgumentException("Truncate length should be greater than 0");
     }
     this.useSignedStringMinMax = useSignedStringMinMax;
     this.statisticsTruncateLength = statisticsTruncateLength;
+    this.readInt96Stats = readInt96Stats;
   }
 
   // NOTE: this cache is for memory savings, not cpu savings, and is used to de-duplicate
@@ -863,37 +870,48 @@ public class ParquetMetadataConverter {
     return type.columnOrder().getColumnOrderName() == ColumnOrderName.TYPE_DEFINED_ORDER;
   }
 
+  private static boolean isMinMaxStatsWritingSupported(PrimitiveType type) {
+    return type.columnOrder().getColumnOrderName() == ColumnOrderName.TYPE_DEFINED_ORDER;
+  }
+
+  private boolean isMinMaxStatsReadingSupported(String createdBy, PrimitiveType type) {
+     if (type.getPrimitiveTypeName() == PrimitiveTypeName.INT96) { // SC-194977
+       return readInt96Stats && ValidInt96Stats.hasValidInt96Stats(createdBy);
+     }
+     return isMinMaxStatsWritingSupported(type);
+  }
+
   /**
    * @param statistics parquet format statistics
    * @param type       a primitive type name
-   * @return the statistics
+   * @return the statistics object converted to the parquet one
    * @deprecated will be removed in 2.0.0.
    */
   @Deprecated
-  public static org.apache.parquet.column.statistics.Statistics fromParquetStatistics(
+  public org.apache.parquet.column.statistics.Statistics fromParquetStatistics(
       Statistics statistics, PrimitiveTypeName type) {
     return fromParquetStatistics(null, statistics, type);
   }
 
   /**
-   * @param createdBy  the created-by string from the file
+   * @param createdBy  the created_by value to check for corrupted files
    * @param statistics parquet format statistics
    * @param type       a primitive type name
-   * @return the statistics
+   * @return the statistics object converted to the parquet one
    * @deprecated will be removed in 2.0.0.
    */
   @Deprecated
-  public static org.apache.parquet.column.statistics.Statistics fromParquetStatistics(
+  public org.apache.parquet.column.statistics.Statistics fromParquetStatistics(
       String createdBy, Statistics statistics, PrimitiveTypeName type) {
     return fromParquetStatisticsInternal(
         createdBy,
         statistics,
-        new PrimitiveType(Repetition.OPTIONAL, type, "fake_type"),
-        defaultSortOrder(type));
+        Types.optional(type).named("fake_type"),
+        SortOrder.SIGNED);
   }
 
   // Visible for testing
-  static org.apache.parquet.column.statistics.Statistics fromParquetStatisticsInternal(
+  org.apache.parquet.column.statistics.Statistics fromParquetStatisticsInternal(
       String createdBy, Statistics formatStats, PrimitiveType type, SortOrder typeSortOrder) {
     // create stats object based on the column type
     org.apache.parquet.column.statistics.Statistics.Builder statsBuilder =
@@ -918,7 +936,8 @@ public class ParquetMetadataConverter {
         // aggregated using a signed byte-wise ordering, which isn't valid for all the
         // types (e.g. strings, decimals etc.).
         if (!CorruptStatistics.shouldIgnoreStatistics(createdBy, type.getPrimitiveTypeName())
-            && (sortOrdersMatch || maxEqualsMin)) {
+            && (sortOrdersMatch || maxEqualsMin)
+            && (type.getPrimitiveTypeName() != PrimitiveTypeName.INT96 || ValidInt96Stats.hasValidInt96Stats(createdBy))) {
           if (isSet) {
             statsBuilder.withMin(formatStats.min.array());
             statsBuilder.withMax(formatStats.max.array());
@@ -2501,7 +2520,7 @@ public class ParquetMetadataConverter {
 
   public static ColumnIndex toParquetColumnIndex(
       PrimitiveType type, org.apache.parquet.internal.column.columnindex.ColumnIndex columnIndex) {
-    if (!isMinMaxStatsSupported(type) || columnIndex == null) {
+    if (!isMinMaxStatsWritingSupported(type) || columnIndex == null) {
       return null;
     }
     ColumnIndex parquetColumnIndex = new ColumnIndex(
@@ -2523,7 +2542,7 @@ public class ParquetMetadataConverter {
 
   public static org.apache.parquet.internal.column.columnindex.ColumnIndex fromParquetColumnIndex(
       PrimitiveType type, ColumnIndex parquetColumnIndex) {
-    if (!isMinMaxStatsSupported(type)) {
+    if (!isMinMaxStatsWritingSupported(type)) {
       return null;
     }
     return ColumnIndexBuilder.build(
@@ -2657,5 +2676,21 @@ public class ParquetMetadataConverter {
       return null;
     }
     return org.apache.parquet.column.schema.EdgeInterpolationAlgorithm.findByValue(thriftAlgo.getValue());
+  }
+
+  public org.apache.parquet.internal.column.columnindex.ColumnIndex fromParquetColumnIndex(
+          String createdBy, PrimitiveType type, ColumnIndex parquetColumnIndex) {
+    if (!isMinMaxStatsReadingSupported(createdBy, type)) {
+      return null;
+    }
+    return ColumnIndexBuilder.build(
+        type,
+        fromParquetBoundaryOrder(parquetColumnIndex.getBoundary_order()),
+        parquetColumnIndex.getNull_pages(),
+        parquetColumnIndex.getNull_counts(),
+        parquetColumnIndex.getMin_values(),
+        parquetColumnIndex.getMax_values(),
+        parquetColumnIndex.getRepetition_level_histograms(),
+        parquetColumnIndex.getDefinition_level_histograms());
   }
 }

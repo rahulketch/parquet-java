@@ -27,6 +27,8 @@ import static org.apache.parquet.hadoop.ParquetInputFormat.HADOOP_VECTORED_IO_DE
 import static org.apache.parquet.hadoop.ParquetInputFormat.HADOOP_VECTORED_IO_ENABLED;
 import static org.apache.parquet.hadoop.ParquetInputFormat.OFF_HEAP_DECRYPT_BUFFER_ENABLED;
 import static org.apache.parquet.hadoop.ParquetInputFormat.PAGE_VERIFY_CHECKSUM_ENABLED;
+import static org.apache.parquet.hadoop.ParquetInputFormat.READ_INT96_STATS_ENABLED;
+import static org.apache.parquet.hadoop.ParquetInputFormat.DEFAULT_READ_INT96_STATS_ENABLED;
 import static org.apache.parquet.hadoop.ParquetInputFormat.RECORD_FILTERING_ENABLED;
 import static org.apache.parquet.hadoop.ParquetInputFormat.STATS_FILTERING_ENABLED;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
@@ -71,6 +73,7 @@ public class ParquetReadOptions {
   private final boolean useBloomFilter;
   private final boolean useOffHeapDecryptBuffer;
   private final boolean useHadoopVectoredIo;
+  private final boolean useInt96Stats;
   private final FilterCompat.Filter recordFilter;
   private final ParquetMetadataConverter.MetadataFilter metadataFilter;
   private final CompressionCodecFactory codecFactory;
@@ -91,6 +94,7 @@ public class ParquetReadOptions {
       boolean useBloomFilter,
       boolean useOffHeapDecryptBuffer,
       boolean useHadoopVectoredIo,
+      boolean useInt96Stats,
       FilterCompat.Filter recordFilter,
       ParquetMetadataConverter.MetadataFilter metadataFilter,
       CompressionCodecFactory codecFactory,
@@ -109,6 +113,7 @@ public class ParquetReadOptions {
         useBloomFilter,
         useOffHeapDecryptBuffer,
         useHadoopVectoredIo,
+        useInt96Stats,
         recordFilter,
         metadataFilter,
         codecFactory,
@@ -130,6 +135,7 @@ public class ParquetReadOptions {
       boolean useBloomFilter,
       boolean useOffHeapDecryptBuffer,
       boolean useHadoopVectoredIo,
+      boolean useInt96Stats,
       FilterCompat.Filter recordFilter,
       ParquetMetadataConverter.MetadataFilter metadataFilter,
       CompressionCodecFactory codecFactory,
@@ -148,6 +154,7 @@ public class ParquetReadOptions {
     this.useBloomFilter = useBloomFilter;
     this.useOffHeapDecryptBuffer = useOffHeapDecryptBuffer;
     this.useHadoopVectoredIo = useHadoopVectoredIo;
+    this.useInt96Stats = useInt96Stats;
     this.recordFilter = recordFilter;
     this.metadataFilter = metadataFilter;
     this.codecFactory = codecFactory;
@@ -193,6 +200,10 @@ public class ParquetReadOptions {
 
   public boolean useHadoopVectoredIo() {
     return useHadoopVectoredIo;
+  }
+
+  public boolean useInt96Stats() {
+    return useInt96Stats;
   }
 
   public FilterCompat.Filter getRecordFilter() {
@@ -258,6 +269,7 @@ public class ParquetReadOptions {
     protected boolean usePageChecksumVerification = PAGE_VERIFY_CHECKSUM_ENABLED_DEFAULT;
     protected boolean useBloomFilter = BLOOM_FILTER_ENABLED_DEFAULT;
     protected boolean useOffHeapDecryptBuffer = USE_OFF_HEAP_DECRYPT_BUFFER_DEFAULT;
+    protected boolean useInt96Stats = DEFAULT_READ_INT96_STATS_ENABLED;
     protected FilterCompat.Filter recordFilter = null;
     protected ParquetMetadataConverter.MetadataFilter metadataFilter = NO_FILTER;
     // the page size parameter isn't used when only using the codec factory to get decompressors
@@ -283,6 +295,7 @@ public class ParquetReadOptions {
       usePageChecksumVerification(conf.getBoolean(PAGE_VERIFY_CHECKSUM_ENABLED, usePageChecksumVerification));
       useBloomFilter(conf.getBoolean(BLOOM_FILTERING_ENABLED, true));
       useOffHeapDecryptBuffer(conf.getBoolean(OFF_HEAP_DECRYPT_BUFFER_ENABLED, false));
+      useInt96Stats(conf.getBoolean(READ_INT96_STATS_ENABLED, DEFAULT_READ_INT96_STATS_ENABLED));
       withCodecFactory(HadoopCodecs.newFactory(conf, 0));
       withRecordFilter(getFilter(conf));
       withMaxAllocationInBytes(conf.getInt(ALLOCATION_SIZE, 8388608));
@@ -372,6 +385,11 @@ public class ParquetReadOptions {
 
     public Builder useBloomFilter(boolean useBloomFilter) {
       this.useBloomFilter = useBloomFilter;
+      return this;
+    }
+
+    public Builder useInt96Stats(boolean useInt96Stats) {
+      this.useInt96Stats = useInt96Stats;
       return this;
     }
 
@@ -469,6 +487,7 @@ public class ParquetReadOptions {
           useBloomFilter,
           useOffHeapDecryptBuffer,
           useHadoopVectoredIo,
+          useInt96Stats,
           recordFilter,
           metadataFilter,
           codecFactory,

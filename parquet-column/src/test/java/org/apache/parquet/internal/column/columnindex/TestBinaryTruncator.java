@@ -18,6 +18,12 @@
  */
 package org.apache.parquet.internal.column.columnindex;
 
+import static org.apache.parquet.schema.LogicalTypeAnnotation.bsonType;
+import static org.apache.parquet.schema.LogicalTypeAnnotation.decimalType;
+import static org.apache.parquet.schema.LogicalTypeAnnotation.enumType;
+import static org.apache.parquet.schema.LogicalTypeAnnotation.intervalType;
+import static org.apache.parquet.schema.LogicalTypeAnnotation.jsonType;
+import static org.apache.parquet.schema.LogicalTypeAnnotation.stringType;
 import static org.apache.parquet.schema.OriginalType.BSON;
 import static org.apache.parquet.schema.OriginalType.DECIMAL;
 import static org.apache.parquet.schema.OriginalType.ENUM;
@@ -32,6 +38,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
@@ -84,16 +92,14 @@ public class TestBinaryTruncator {
   public void testContractNonStringTypes() {
     testTruncator(
         Types.required(FIXED_LEN_BYTE_ARRAY)
-            .length(8)
-            .as(DECIMAL)
-            .precision(18)
-            .scale(4)
+            .length(16)
+            .as(decimalType(38, 4))
             .named("test_fixed_decimal"),
         false);
     testTruncator(
         Types.required(FIXED_LEN_BYTE_ARRAY).length(12).as(INTERVAL).named("test_fixed_interval"), false);
-    testTruncator(Types.required(BINARY).as(DECIMAL).precision(10).scale(2).named("test_binary_decimal"), false);
-    testTruncator(Types.required(INT96).named("test_int96"), false);
+    testTruncator(Types.required(BINARY).as(decimalType(10, 2)).named("test_binary_decimal"), false);
+    testInt96Truncator(Types.required(INT96).named("test_int96"), false);
   }
 
   @Test
@@ -150,10 +156,10 @@ public class TestBinaryTruncator {
   @Test
   public void testContractStringTypes() {
     testTruncator(Types.required(BINARY).named("test_binary"), true);
-    testTruncator(Types.required(BINARY).as(UTF8).named("test_utf8"), true);
-    testTruncator(Types.required(BINARY).as(ENUM).named("test_enum"), true);
-    testTruncator(Types.required(BINARY).as(JSON).named("test_json"), true);
-    testTruncator(Types.required(BINARY).as(BSON).named("test_bson"), true);
+    testTruncator(Types.required(BINARY).as(stringType()).named("test_utf8"), true);
+    testTruncator(Types.required(BINARY).as(enumType()).named("test_enum"), true);
+    testTruncator(Types.required(BINARY).as(jsonType()).named("test_json"), true);
+    testTruncator(Types.required(BINARY).as(bsonType()).named("test_bson"), true);
     testTruncator(Types.required(FIXED_LEN_BYTE_ARRAY).length(5).named("test_fixed"), true);
   }
 
@@ -310,5 +316,33 @@ public class TestBinaryTruncator {
       byteArray[i] = (byte) b;
     }
     return Binary.fromConstantByteArray(byteArray);
+  }
+
+  private Binary createInt96Value(long nanoseconds, int julianDay) {
+    ByteBuffer buffer = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN);
+    buffer.putLong(nanoseconds);
+    buffer.putInt(julianDay);
+    return Binary.fromConstantByteArray(buffer.array());
+  }
+
+  private void testInt96Truncator(PrimitiveType type, boolean strict) {
+    BinaryTruncator truncator = BinaryTruncator.getTruncator(type);
+    Comparator<Binary> comparator = type.comparator();
+
+    // Test with various INT96 timestamp values
+    Binary int96_1 = createInt96Value(1000000000L, 2457754); // 2017-01-01
+    Binary int96_2 = createInt96Value(2000000000L, 2457754); // Same day, later time
+    Binary int96_3 = createInt96Value(1000000000L, 2457755); // Next day, same time
+
+    checkContract(truncator, comparator, int96_1, strict, strict);
+    checkContract(truncator, comparator, int96_2, strict, strict);
+    checkContract(truncator, comparator, int96_3, strict, strict);
+
+    // Edge case: minimum and maximum values
+    Binary int96_min = createInt96Value(0L, 0);
+    Binary int96_max = createInt96Value(Long.MAX_VALUE, Integer.MAX_VALUE);
+    
+    checkContract(truncator, comparator, int96_min, strict, strict);
+    checkContract(truncator, comparator, int96_max, strict, strict);
   }
 }

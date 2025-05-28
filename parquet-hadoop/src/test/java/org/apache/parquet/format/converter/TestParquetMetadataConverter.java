@@ -150,6 +150,7 @@ public class TestParquetMetadataConverter {
   private static final String CHAR_UPPER = CHAR_LOWER.toUpperCase();
   private static final String NUMBER = "0123456789";
   private static final String DATA_FOR_RANDOM_STRING = CHAR_LOWER + CHAR_UPPER + NUMBER;
+  private static final String CREATED_BY = "parquet-mr";
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -1169,7 +1170,8 @@ public class TestParquetMetadataConverter {
 
   private void testSkippedV2Stats(PrimitiveType type, Object min, Object max) {
     Statistics<?> stats = createStats(type, min, max);
-    org.apache.parquet.format.Statistics statistics = ParquetMetadataConverter.toParquetStatistics(stats);
+    ParquetMetadataConverter converter = new ParquetMetadataConverter();
+    org.apache.parquet.format.Statistics statistics = converter.toParquetStatistics(CREATED_BY, stats);
     assertFalse(statistics.isSetMin());
     assertFalse(statistics.isSetMax());
     assertFalse(statistics.isSetMin_value());
@@ -1207,7 +1209,8 @@ public class TestParquetMetadataConverter {
 
   private void testV2OnlyStats(PrimitiveType type, Object min, Object max) {
     Statistics<?> stats = createStats(type, min, max);
-    org.apache.parquet.format.Statistics statistics = ParquetMetadataConverter.toParquetStatistics(stats);
+    ParquetMetadataConverter converter = new ParquetMetadataConverter();
+    org.apache.parquet.format.Statistics statistics = converter.toParquetStatistics(CREATED_BY, stats);
     assertFalse(statistics.isSetMin());
     assertFalse(statistics.isSetMax());
     assertEquals(ByteBuffer.wrap(stats.getMinBytes()), statistics.min_value);
@@ -1249,7 +1252,8 @@ public class TestParquetMetadataConverter {
 
   private void testV2StatsEqualMinMax(PrimitiveType type, Object min, Object max) {
     Statistics<?> stats = createStats(type, min, max);
-    org.apache.parquet.format.Statistics statistics = ParquetMetadataConverter.toParquetStatistics(stats);
+    ParquetMetadataConverter converter = new ParquetMetadataConverter();
+    org.apache.parquet.format.Statistics statistics = converter.toParquetStatistics(CREATED_BY, stats);
     assertEquals(ByteBuffer.wrap(stats.getMinBytes()), statistics.min);
     assertEquals(ByteBuffer.wrap(stats.getMaxBytes()), statistics.max);
     assertEquals(ByteBuffer.wrap(stats.getMinBytes()), statistics.min_value);
@@ -1340,7 +1344,8 @@ public class TestParquetMetadataConverter {
     V1() {
       @Override
       public org.apache.parquet.format.Statistics toParquetStatistics(Statistics<?> stats) {
-        org.apache.parquet.format.Statistics statistics = ParquetMetadataConverter.toParquetStatistics(stats);
+        ParquetMetadataConverter converter = new ParquetMetadataConverter();
+        org.apache.parquet.format.Statistics statistics = converter.toParquetStatistics(CREATED_BY, stats);
         statistics.unsetMin_value();
         statistics.unsetMax_value();
         return statistics;
@@ -1350,7 +1355,8 @@ public class TestParquetMetadataConverter {
     V2() {
       @Override
       public org.apache.parquet.format.Statistics toParquetStatistics(Statistics<?> stats) {
-        return ParquetMetadataConverter.toParquetStatistics(stats);
+        ParquetMetadataConverter converter = new ParquetMetadataConverter();
+        return converter.toParquetStatistics(CREATED_BY, stats);
       }
     };
 
